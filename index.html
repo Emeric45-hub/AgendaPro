@@ -41,7 +41,9 @@
   .nav{
     display:flex;align-items:center;gap:8px;
     padding:14px 2px 10px;position:sticky;top:0;z-index:5;
-    background:linear-gradient(to bottom,var(--bg) 78%,transparent);
+    background:rgba(237,240,241,.96);
+    -webkit-backdrop-filter:saturate(180%) blur(12px);backdrop-filter:saturate(180%) blur(12px);
+    box-shadow:0 6px 10px -10px rgba(0,0,0,.35);
   }
   .nav h1{flex:1;margin:0;font-size:1.06rem;font-weight:640;letter-spacing:-.015em}
   .nav h1 small{display:block;font-size:.78rem;font-weight:400;color:var(--muted);letter-spacing:0}
@@ -59,19 +61,27 @@
   .day.vide{background:transparent;box-shadow:inset 0 0 0 1px var(--line)}
   .dh{display:flex;align-items:baseline;gap:7px;margin:0 0 7px}
   .dh .j{font-size:.95rem;font-weight:600;text-transform:capitalize}
-  .dh .n{font-size:.8rem;color:var(--muted)}
   .day.vide .dh{margin:0}
   .day.vide .j{font-weight:400;color:var(--muted)}
 
-  .ev{display:flex;gap:9px;align-items:flex-start;padding:4px 0 4px 9px;border-left:3px solid var(--c-off)}
-  .ev time{flex:0 0 84px;font-size:.83rem;color:var(--muted);font-variant-numeric:tabular-nums;padding-top:1px}
-  .ev .t{font-size:.93rem}
-  .ev .m{color:var(--muted);font-size:.81rem}
-  .bloc{border-color:var(--c-bloc)}   .cs{border-color:var(--c-cs)}
-  .visite{border-color:var(--c-visite)} .perm{border-color:var(--c-perm)}
-  .garde{border-color:var(--c-garde)}  .off{border-color:var(--c-off)}
-  .fmc{border-color:var(--c-fmc)}      .staff{border-color:var(--c-staff)}
-  .garde .t{color:var(--c-garde);font-weight:560}
+  .ev{
+    display:flex;gap:10px;align-items:flex-start;
+    padding:8px 11px;border-radius:9px;margin:0 0 5px;
+    background:var(--tint);border-left:4px solid var(--edge);
+  }
+  .ev:last-child{margin-bottom:0}
+  .ev time{flex:0 0 78px;font-size:.82rem;color:var(--muted);font-variant-numeric:tabular-nums;padding-top:1px}
+  .ev .t{font-size:.93rem;font-weight:520}
+  .ev .m{color:var(--muted);font-size:.81rem;font-weight:400}
+  .bloc  {--tint:#E2EFE6; --edge:var(--c-bloc)}
+  .cs    {--tint:#F7E5EE; --edge:var(--c-cs)}
+  .visite{--tint:#EAE3F6; --edge:var(--c-visite)}
+  .perm  {--tint:#FAEBD6; --edge:var(--c-perm)}
+  .garde {--tint:#F8DDDD; --edge:var(--c-garde)}
+  .off   {--tint:#E6E9EB; --edge:var(--c-off)}
+  .fmc   {--tint:#DEEAF2; --edge:var(--c-fmc)}
+  .staff {--tint:#E2E7F4; --edge:var(--c-staff)}
+  .garde .t{color:var(--c-garde);font-weight:600}
 
   /* ---------- écran d'import ---------- */
   .panel{background:var(--surface);border-radius:12px;padding:16px;margin:0 0 14px}
@@ -116,7 +126,7 @@
   <section id="vue-semaine">
     <div class="nav">
       <button class="arrow" id="prev" aria-label="Semaine précédente">‹</button>
-      <h1 id="titre">Planning<small id="sstitre">v4 — script non exécuté</small></h1>
+      <h1 id="titre">Planning<small id="sstitre">v6 — script non exécuté</small></h1>
       <button class="arrow" id="next" aria-label="Semaine suivante">›</button>
     </div>
     <div id="semaine"></div>
@@ -156,6 +166,7 @@ const H = {
   csAprem:      ["14:00","17:00"],
   repos:        ["08:00","17:00"],
   staff:        ["16:30","18:00"],
+  garde:        ["18:00","23:59"],
   sableCsMatin: ["09:40","12:00"],
   sableUrg1:    ["12:00","12:20"],
   sableUrg2:    ["13:40","14:00"],
@@ -248,7 +259,7 @@ function construireJour(date, matin, aprem, garde, statut, paire){
   const S = statut.toUpperCase();
   const jour = date.getDay();
 
-  if(garde) push("Garde", null, "garde", "18h → 8h le lendemain");
+  if(garde) push("Garde", H.garde, "garde");
 
   const staff = () => { if(STAFFS[jour]) push(STAFFS[jour], H.staff, "staff"); };
 
@@ -292,14 +303,16 @@ function construireJour(date, matin, aprem, garde, statut, paire){
     if(SALLES.test(x.label)) push("Consultations", h, "cs", x.label.replace(/\s+/g," "));
     else { const n = AUTRES[x.label.toUpperCase()]; if(n) push(n, h, "cs"); }
   });
-  salles(matin, H.csMatin);
-  salles(aprem, H.csAprem);
+  if(!perm){                       // de permanence : la journée est couverte 8h-18h
+    salles(matin, H.csMatin);
+    salles(aprem, H.csAprem);
+  }
 
   matin.concat(aprem).forEach(x => {
     if(/[<>]/.test(x.valeur)) push("À vérifier : " + x.valeur, null, "off", x.label);
   });
 
-  if(ev.length) staff();
+  if(ev.some(e => e.cls !== "garde")) staff();
   return ev;
 }
 
@@ -356,9 +369,11 @@ function rendreSemaine(){
   }
 
   const s = SEMAINES[curseur];
-  const d1 = s.jours[0].date, d2 = s.jours[s.jours.length-1].date;
+  const d1 = s.jours[0].date;
+  const debut = new Date(d1); debut.setDate(debut.getDate() - ((debut.getDay()+6)%7)); // lundi
+  const dim = new Date(debut); dim.setDate(debut.getDate()+6);
   titre.childNodes[0].nodeValue = "Semaine " + s.num;
-  sst.textContent = d1.getDate() + " " + MOIS[d1.getMonth()] + " – " + d2.getDate() + " " + MOIS[d2.getMonth()];
+  sst.textContent = debut.getDate() + " " + MOIS[debut.getMonth()] + " – " + dim.getDate() + " " + MOIS[dim.getMonth()];
   document.getElementById("prev").disabled = curseur === 0;
   document.getElementById("next").disabled = curseur === SEMAINES.length-1;
 
@@ -367,20 +382,18 @@ function rendreSemaine(){
 
   // toute la semaine, y compris les jours sans rien
   let html = "";
-  const debut = new Date(d1); debut.setDate(debut.getDate() - ((debut.getDay()+6)%7));
   for(let k=0;k<7;k++){
     const d = new Date(debut); d.setDate(debut.getDate()+k);
     const j = parDate[iso(d)];
     const now = iso(d) === auj ? " now" : "";
     if(!j){
-      if(k >= 5) continue; // week-end vide : on n'encombre pas
+      if(k >= 5 || iso(d) < auj) continue; // week-end vide ou jour passé : on n'encombre pas
       html += '<div class="day vide' + now + '"><div class="dh"><span class="j">' +
               JOURS[d.getDay()] + " " + d.getDate() + '</span></div></div>';
       continue;
     }
     html += '<div class="day' + now + '"><div class="dh"><span class="j">' +
-            JOURS[d.getDay()] + " " + d.getDate() + '</span>' +
-            '<span class="n">' + j.evenements.length + '</span></div>';
+            JOURS[d.getDay()] + " " + d.getDate() + '</span></div>';
     j.evenements.forEach(e => {
       html += '<div class="ev ' + e.cls + '"><time>' +
               (e.debut ? e.debut.replace(":","h") + "–" + e.fin.replace(":","h") : "journée") +
@@ -509,6 +522,16 @@ function traiter(buf){
 /* ================================================================== */
 document.getElementById("prev").addEventListener("click", () => { if(curseur > 0){ curseur--; rendreSemaine(); window.scrollTo(0,0);} });
 document.getElementById("next").addEventListener("click", () => { if(curseur < SEMAINES.length-1){ curseur++; rendreSemaine(); window.scrollTo(0,0);} });
+
+let tx = 0, ty = 0;
+const vue = document.getElementById("vue-semaine");
+vue.addEventListener("touchstart", e => { tx = e.changedTouches[0].clientX; ty = e.changedTouches[0].clientY; }, {passive:true});
+vue.addEventListener("touchend", e => {
+  const dx = e.changedTouches[0].clientX - tx, dy = e.changedTouches[0].clientY - ty;
+  if(Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy)*1.5) return;
+  const b = document.getElementById(dx < 0 ? "next" : "prev");
+  if(!b.disabled) b.click();
+}, {passive:true});
 
 function onglet(actif){
   const s = actif === "s";
