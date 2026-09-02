@@ -116,7 +116,7 @@
   <section id="vue-semaine">
     <div class="nav">
       <button class="arrow" id="prev" aria-label="Semaine précédente">‹</button>
-      <h1 id="titre">Planning<small id="sstitre">v3 — script non exécuté</small></h1>
+      <h1 id="titre">Planning<small id="sstitre">v4 — script non exécuté</small></h1>
       <button class="arrow" id="next" aria-label="Semaine suivante">›</button>
     </div>
     <div id="semaine"></div>
@@ -185,7 +185,7 @@ function docteurJunior(v){
   return m ? m[1].toUpperCase() : null;
 }
 function toDate(v){
-  if(v instanceof Date) return new Date(v.getFullYear(), v.getMonth(), v.getDate());
+  if(v instanceof Date) return new Date(v.getUTCFullYear(), v.getUTCMonth(), v.getUTCDate());
   if(typeof v === "number"){
     const d = new Date(Date.UTC(1899,11,30 + Math.floor(v)));
     return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
@@ -476,7 +476,7 @@ document.getElementById("fichier").addEventListener("change", e => {
 });
 
 function traiter(buf){
-  const wb = XLSX.read(buf, {type:"array", cellDates:true});
+  const wb = XLSX.read(buf, {type:"array"});   // pas de cellDates : conversion maison, insensible au fuseau
   const auj = minuit(new Date());
   const res = [];
   wb.SheetNames.forEach(nom => {
@@ -491,7 +491,10 @@ function traiter(buf){
       const d = f.dates[i];
       if(!d || d < auj) continue;
       const evs = construireJour(d, f.matin[i], f.aprem[i], f.gardes[i], f.statuts[i], paire);
-      if(evs.length) res.push({date:d, semaine:num, evenements:evs});
+      if(evs.length){
+        evs.sort((x,y) => (x.debut||"").localeCompare(y.debut||""));
+        res.push({date:d, semaine:num, evenements:evs});
+      }
     }
   });
   if(!res.length) throw new Error("Aucune vacation trouvée pour " + INITIALES + " à partir d'aujourd'hui. Vérifie que c'est le bon fichier.");
