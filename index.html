@@ -1,3 +1,5 @@
+<!DOCTYPE html>
+<html lang="fr">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -114,7 +116,7 @@
   <section id="vue-semaine">
     <div class="nav">
       <button class="arrow" id="prev" aria-label="Semaine précédente">‹</button>
-      <h1 id="titre">Planning<small id="sstitre">Aucun semainier chargé</small></h1>
+      <h1 id="titre">Planning<small id="sstitre">v3 — script non exécuté</small></h1>
       <button class="arrow" id="next" aria-label="Semaine suivante">›</button>
     </div>
     <div id="semaine"></div>
@@ -305,27 +307,27 @@ function construireJour(date, matin, aprem, garde, statut, paire){
 /* État et mémoire                                                     */
 /* ================================================================== */
 const CLE = "planning-ed-v2";
-let JOURS = [];      // [{date:Date, semaine, evenements:[]}]
+let PLANNING = [];   // [{date:Date, semaine, evenements:[]}]
 let curseur = 0;     // index de la semaine affichée
 let SEMAINES = [];   // [{num, jours:[...]}]
 
 function sauver(){
   try{
-    localStorage.setItem(CLE, JSON.stringify(JOURS.map(j => ({...j, date: iso(j.date)}))));
+    localStorage.setItem(CLE, JSON.stringify(PLANNING.map(j => ({...j, date: iso(j.date)}))));
   }catch(e){ /* mode privé ou stockage indisponible : on continue sans mémoire */ }
 }
 function charger(){
   try{
     const brut = localStorage.getItem(CLE);
     if(!brut) return false;
-    JOURS = JSON.parse(brut).map(j => ({...j, date: new Date(j.date + "T00:00:00")}));
-    return JOURS.length > 0;
+    PLANNING = JSON.parse(brut).map(j => ({...j, date: new Date(j.date + "T00:00:00")}));
+    return PLANNING.length > 0;
   }catch(e){ return false; }
 }
 
 function grouper(){
   SEMAINES = [];
-  JOURS.forEach(j => {
+  PLANNING.forEach(j => {
     let s = SEMAINES[SEMAINES.length-1];
     if(!s || s.num !== j.semaine){ s = {num:j.semaine, jours:[]}; SEMAINES.push(s); }
     s.jours.push(j);
@@ -397,11 +399,11 @@ function rendreImport(msg){
   const z = document.getElementById("import-zone");
   let html = msg ? '<div class="err">' + esc(msg) + '</div>' : "";
 
-  if(JOURS.length){
-    const total = JOURS.reduce((n,j) => n + j.evenements.length, 0);
+  if(PLANNING.length){
+    const total = PLANNING.reduce((n,j) => n + j.evenements.length, 0);
     html += '<div class="panel"><div class="stat">' +
             '<div><b>' + SEMAINES.length + '</b><span>semaines</span></div>' +
-            '<div><b>' + JOURS.length + '</b><span>journées</span></div>' +
+            '<div><b>' + PLANNING.length + '</b><span>journées</span></div>' +
             '<div><b>' + total + '</b><span>événements</span></div></div></div>';
     html += '<button class="big" id="gen">Générer le calendrier</button>' +
             '<ul class="help">' +
@@ -429,7 +431,7 @@ function ics(){
   const ech = s => String(s).replace(/([,;\\])/g,"\\$1").replace(/\n/g,"\\n");
   const stamp = new Date().toISOString().replace(/[-:]/g,"").split(".")[0] + "Z";
   const L = ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Semainier//FR","CALSCALE:GREGORIAN","METHOD:PUBLISH"];
-  JOURS.forEach(j => {
+  PLANNING.forEach(j => {
     const d = iso(j.date).replace(/-/g,"");
     j.evenements.forEach((e,k) => {
       L.push("BEGIN:VEVENT", "UID:" + d + "-" + k + "-semainier@local", "DTSTAMP:" + stamp);
@@ -493,7 +495,7 @@ function traiter(buf){
     }
   });
   if(!res.length) throw new Error("Aucune vacation trouvée pour " + INITIALES + " à partir d'aujourd'hui. Vérifie que c'est le bon fichier.");
-  JOURS = res;
+  PLANNING = res;
   grouper(); sauver();
   rendreImport(); rendreSemaine();
   document.getElementById("tab-s").click();
