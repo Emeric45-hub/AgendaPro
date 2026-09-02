@@ -56,6 +56,12 @@
   .arrow:disabled{opacity:.35;cursor:default}
 
   /* ---------- journées ---------- */
+  #semaine{will-change:transform,opacity}
+  @keyframes entreG{from{transform:translateX(-22px);opacity:0}to{transform:none;opacity:1}}
+  @keyframes entreD{from{transform:translateX(22px);opacity:0}to{transform:none;opacity:1}}
+  .glisseG{animation:entreG .28s cubic-bezier(.32,.72,0,1)}
+  .glisseD{animation:entreD .28s cubic-bezier(.32,.72,0,1)}
+  @media (prefers-reduced-motion:reduce){.glisseG,.glisseD{animation:none}}
   .day{background:var(--surface);border-radius:12px;padding:11px 13px;margin:0 0 7px}
   .day.now{background:var(--today);box-shadow:inset 0 0 0 1.5px #E9C877}
   .day.vide{background:transparent;box-shadow:inset 0 0 0 1px var(--line)}
@@ -126,7 +132,7 @@
   <section id="vue-semaine">
     <div class="nav">
       <button class="arrow" id="prev" aria-label="Semaine précédente">‹</button>
-      <h1 id="titre">Planning<small id="sstitre">v6 — script non exécuté</small></h1>
+      <h1 id="titre">Planning<small id="sstitre">v7 — script non exécuté</small></h1>
       <button class="arrow" id="next" aria-label="Semaine suivante">›</button>
     </div>
     <div id="semaine"></div>
@@ -168,8 +174,6 @@ const H = {
   staff:        ["16:30","18:00"],
   garde:        ["18:00","23:59"],
   sableCsMatin: ["09:40","12:00"],
-  sableUrg1:    ["12:00","12:20"],
-  sableUrg2:    ["13:40","14:00"],
   sableCsAprem: ["14:00","17:00"],
   sableBloc:    ["13:30","17:00"]
 };
@@ -272,10 +276,8 @@ function construireJour(date, matin, aprem, garde, statut, paire){
 
   if(/BAILLEUL|PSSL|SABL/i.test(statut)){
     push("Consultations", H.sableCsMatin, "cs", "Le Bailleul");
-    push("Urgences", H.sableUrg1, "cs", "Le Bailleul");
     if(paire) push("Bloc opératoire", H.sableBloc, "bloc", "Le Bailleul");
-    else { push("Urgences", H.sableUrg2, "cs", "Le Bailleul");
-           push("Consultations", H.sableCsAprem, "cs", "Le Bailleul"); }
+    else      push("Consultations", H.sableCsAprem, "cs", "Le Bailleul");
     return ev;
   }
 
@@ -353,8 +355,10 @@ function grouper(){
 /* ================================================================== */
 /* Rendu — vue semaine                                                 */
 /* ================================================================== */
-function rendreSemaine(){
+function rendreSemaine(sens){
   const zone = document.getElementById("semaine");
+  zone.classList.remove("glisseG","glisseD");
+  if(sens){ void zone.offsetWidth; zone.classList.add(sens > 0 ? "glisseD" : "glisseG"); }
   const titre = document.getElementById("titre");
   const sst = document.getElementById("sstitre");
 
@@ -520,8 +524,8 @@ function traiter(buf){
 /* ================================================================== */
 /* Navigation                                                          */
 /* ================================================================== */
-document.getElementById("prev").addEventListener("click", () => { if(curseur > 0){ curseur--; rendreSemaine(); window.scrollTo(0,0);} });
-document.getElementById("next").addEventListener("click", () => { if(curseur < SEMAINES.length-1){ curseur++; rendreSemaine(); window.scrollTo(0,0);} });
+document.getElementById("prev").addEventListener("click", () => { if(curseur > 0){ curseur--; rendreSemaine(-1); window.scrollTo(0,0);} });
+document.getElementById("next").addEventListener("click", () => { if(curseur < SEMAINES.length-1){ curseur++; rendreSemaine(1); window.scrollTo(0,0);} });
 
 let tx = 0, ty = 0;
 const vue = document.getElementById("vue-semaine");
