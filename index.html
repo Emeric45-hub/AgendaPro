@@ -70,15 +70,29 @@
   .day.vide .dh{margin:0}
   .day.vide .j{font-weight:400;color:var(--muted)}
 
-  .ev{
-    display:flex;gap:10px;align-items:flex-start;
-    padding:8px 11px;border-radius:9px;margin:0 0 5px;
+  .chip{
+    display:flex;gap:9px;align-items:baseline;
+    padding:7px 11px;border-radius:9px;margin:0 0 6px;
     background:var(--tint);border-left:4px solid var(--edge);
   }
-  .ev:last-child{margin-bottom:0}
-  .ev time{flex:0 0 78px;font-size:.82rem;color:var(--muted);font-variant-numeric:tabular-nums;padding-top:1px}
-  .ev .t{font-size:.93rem;font-weight:520}
-  .ev .m{color:var(--muted);font-size:.81rem;font-weight:400}
+  .chip .t{font-size:.92rem;font-weight:520}
+  .chip .m{color:var(--muted);font-size:.81rem}
+
+  .tl{position:relative;margin:2px 0 0 34px;border-left:1px solid var(--line)}
+  .hh{position:absolute;left:0;right:0;border-top:1px dashed #E1E5E8;pointer-events:none}
+  .hh span{
+    position:absolute;left:-34px;top:-8px;width:30px;text-align:right;
+    font-size:.7rem;color:#9AA3AA;font-variant-numeric:tabular-nums;
+  }
+  .blk{
+    position:absolute;overflow:hidden;
+    padding:4px 7px;border-radius:7px;
+    background:var(--tint);border-left:3px solid var(--edge);
+  }
+  .blk .t{display:block;font-size:.84rem;font-weight:560;line-height:1.2}
+  .blk .m{font-size:.76rem;color:var(--muted);font-weight:400}
+  .blk .h{display:block;font-size:.71rem;color:var(--muted);font-variant-numeric:tabular-nums;margin-top:1px}
+  .blk.etroit .t{font-size:.78rem}
   .bloc  {--tint:#E2EFE6; --edge:var(--c-bloc)}
   .cs    {--tint:#F7E5EE; --edge:var(--c-cs)}
   .visite{--tint:#EAE3F6; --edge:var(--c-visite)}
@@ -87,7 +101,7 @@
   .off   {--tint:#E6E9EB; --edge:var(--c-off)}
   .fmc   {--tint:#DEEAF2; --edge:var(--c-fmc)}
   .staff {--tint:#E2E7F4; --edge:var(--c-staff)}
-  .garde .t{color:var(--c-garde);font-weight:600}
+  .garde .t{color:var(--c-garde)}
 
   /* ---------- écran d'import ---------- */
   .panel{background:var(--surface);border-radius:12px;padding:16px;margin:0 0 14px}
@@ -132,7 +146,7 @@
   <section id="vue-semaine">
     <div class="nav">
       <button class="arrow" id="prev" aria-label="Semaine précédente">‹</button>
-      <h1 id="titre">Planning<small id="sstitre">v7 — script non exécuté</small></h1>
+      <h1 id="titre">Planning<small id="sstitre">v8 — script non exécuté</small></h1>
       <button class="arrow" id="next" aria-label="Semaine suivante">›</button>
     </div>
     <div id="semaine"></div>
@@ -321,7 +335,7 @@ function construireJour(date, matin, aprem, garde, statut, paire){
 /* ================================================================== */
 /* État et mémoire                                                     */
 /* ================================================================== */
-const CLE = "planning-ed-v2";
+const CLE = "planning-ed-v8";
 let PLANNING = [];   // [{date:Date, semaine, evenements:[]}]
 let curseur = 0;     // index de la semaine affichée
 let SEMAINES = [];   // [{num, jours:[...]}]
@@ -355,6 +369,50 @@ function grouper(){
 /* ================================================================== */
 /* Rendu — vue semaine                                                 */
 /* ================================================================== */
+const PXH = 42;                       // pixels par heure
+const mn = h => (+h.slice(0,2))*60 + (+h.slice(3,5));
+
+function frise(evs){
+  const pleins = evs.filter(e => !e.debut);
+  const cales  = evs.filter(e => e.debut).map(e => ({...e, s:mn(e.debut), e2:mn(e.fin)}))
+                    .sort((a,b) => a.s - b.s || b.e2 - a.e2);
+
+  let html = pleins.map(e =>
+    '<div class="chip ' + e.cls + '"><span class="t">' + esc(e.titre) + '</span>' +
+    (e.note ? '<span class="m">' + esc(e.note) + '</span>' : '') + '</div>').join("");
+
+  if(!cales.length) return html;
+
+  // colonnes : on prend la première libre au moment où l'événement démarre
+  const fins = [];
+  cales.forEach(e => {
+    let c = fins.findIndex(f => f <= e.s);
+    if(c < 0) c = fins.length;
+    fins[c] = e.e2; e.col = c;
+  });
+  const nb = Math.max(1, fins.length);
+
+  const h0 = Math.floor(Math.min(...cales.map(e => e.s)) / 60);
+  const h1 = Math.ceil(Math.max(...cales.map(e => e.e2)) / 60);
+  const y  = m => (m - h0*60) / 60 * PXH;
+
+  html += '<div class="tl" style="height:' + ((h1-h0)*PXH) + 'px">';
+  for(let h = h0; h <= h1; h++)
+    html += '<div class="hh" style="top:' + ((h-h0)*PXH) + 'px"><span>' + pad(h) + 'h</span></div>';
+
+  cales.forEach(e => {
+    const t = y(e.s), ht = Math.max(20, y(e.e2) - t - 2);
+    const l = e.col * 100 / nb, w = 100 / nb;
+    html += '<div class="blk ' + e.cls + (nb > 1 ? ' etroit' : '') + '" style="top:' + t +
+            'px;height:' + ht + 'px;left:calc(' + l + '% + 4px);width:calc(' + w + '% - 8px)">' +
+            '<span class="t">' + esc(e.titre) +
+            (e.note ? ' <span class="m">' + esc(e.note) + '</span>' : '') + '</span>' +
+            (ht >= 40 ? '<span class="h">' + e.debut.replace(":","h") + '–' + e.fin.replace(":","h") + '</span>' : '') +
+            '</div>';
+  });
+  return html + '</div>';
+}
+
 function rendreSemaine(sens){
   const zone = document.getElementById("semaine");
   zone.classList.remove("glisseG","glisseD");
@@ -397,14 +455,7 @@ function rendreSemaine(sens){
       continue;
     }
     html += '<div class="day' + now + '"><div class="dh"><span class="j">' +
-            JOURS[d.getDay()] + " " + d.getDate() + '</span></div>';
-    j.evenements.forEach(e => {
-      html += '<div class="ev ' + e.cls + '"><time>' +
-              (e.debut ? e.debut.replace(":","h") + "–" + e.fin.replace(":","h") : "journée") +
-              '</time><div><span class="t">' + esc(e.titre) + '</span>' +
-              (e.note ? ' <span class="m">' + esc(e.note) + '</span>' : '') + '</div></div>';
-    });
-    html += '</div>';
+            JOURS[d.getDay()] + " " + d.getDate() + '</span></div>' + frise(j.evenements) + '</div>';
   }
   zone.innerHTML = html;
 }
