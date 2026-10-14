@@ -26,6 +26,7 @@
     --line:#DCE1E4; --today:#FFF8E6;
     --c-bloc:#3F7D4E; --c-cs:#B4557F; --c-visite:#7A5CA8; --c-perm:#B8762A;
     --c-garde:#A83232; --c-off:#7A848D; --c-fmc:#2F6F8F; --c-staff:#4A5B8C;
+    --c-perso:#9A6B2F;
   }
   *{box-sizing:border-box}
   html,body{margin:0;padding:0;overscroll-behavior-y:none}
@@ -103,6 +104,73 @@
   .staff {--tint:#E2E7F4; --edge:var(--c-staff)}
   .garde .t{color:var(--c-garde)}
 
+  /* ---------- retouches ---------- */
+  .dh{justify-content:space-between}
+  .dh .g{display:flex;align-items:baseline;gap:7px}
+  .pt{font-size:.7rem;color:var(--c-perso);border:1px solid var(--c-perso);
+      border-radius:5px;padding:0 4px;line-height:1.35}
+  .men{
+    border:0;background:none;color:var(--muted);font-size:1.1rem;line-height:1;
+    padding:2px 4px;margin:-2px -4px;cursor:pointer;-webkit-tap-highlight-color:transparent;
+  }
+  .blk,.chip{cursor:pointer}
+  .perso{--tint:#EDE7DF; --edge:var(--c-perso)}
+  .blk.chg::after,.chip.chg::after{
+    content:"";position:absolute;top:5px;right:5px;width:5px;height:5px;
+    border-radius:3px;background:var(--c-perso);
+  }
+  .chip{position:relative}
+
+  /* ---------- feuille d'édition ---------- */
+  .fond{
+    position:fixed;inset:0;z-index:40;background:rgba(20,26,29,.35);
+    opacity:0;pointer-events:none;transition:opacity .22s ease;
+  }
+  .fond.on{opacity:1;pointer-events:auto}
+  .sheet{
+    position:fixed;left:0;right:0;bottom:0;z-index:41;
+    background:var(--surface);border-radius:18px 18px 0 0;
+    padding:18px 16px calc(18px + env(safe-area-inset-bottom));
+    transform:translateY(102%);transition:transform .3s cubic-bezier(.32,.72,0,1);
+    max-height:88vh;overflow-y:auto;box-shadow:0 -8px 30px rgba(0,0,0,.14);
+  }
+  .sheet.on{transform:none}
+  @media (prefers-reduced-motion:reduce){.sheet,.fond{transition:none}}
+  .sheet h3{margin:0 0 14px;font-size:1.02rem;font-weight:620}
+  .sheet label{display:block;font-size:.78rem;color:var(--muted);margin:0 0 4px}
+  .sheet input[type=text],.sheet input[type=time]{
+    width:100%;font:inherit;font-size:.95rem;color:var(--ink);background:var(--bg);
+    border:1px solid var(--line);border-radius:9px;padding:10px 11px;margin:0 0 12px;
+    -webkit-appearance:none;appearance:none;
+  }
+  .sheet input[type=time]{min-height:42px}
+  .duo{display:flex;gap:10px}.duo>div{flex:1}
+  .types{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
+  .types button{
+    font:inherit;font-size:.82rem;font-weight:520;color:var(--ink);
+    background:var(--tint);border:1.5px solid transparent;border-radius:8px;
+    padding:7px 11px;cursor:pointer;-webkit-tap-highlight-color:transparent;
+  }
+  .types button[aria-pressed="true"]{border-color:var(--edge)}
+  .bascule{display:flex;align-items:center;gap:9px;margin:0 0 14px;font-size:.9rem}
+  .bascule input{width:20px;height:20px;accent-color:var(--c-fmc)}
+  .actions{display:flex;flex-direction:column;gap:8px;margin-top:4px}
+  .actions button{
+    font:inherit;font-weight:560;border-radius:11px;padding:13px;cursor:pointer;border:0;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .b1{background:var(--ink);color:#fff}
+  .b2{background:var(--surface);color:var(--ink);border:1px solid var(--line) !important}
+  .b3{background:#FBE9E9;color:#8C2525}
+  .menu{display:flex;flex-direction:column;gap:2px;margin:-4px 0 0}
+  .menu button{
+    font:inherit;font-size:.95rem;text-align:left;background:none;border:0;color:var(--ink);
+    padding:14px 4px;cursor:pointer;border-bottom:1px solid var(--line);
+    -webkit-tap-highlight-color:transparent;
+  }
+  .menu button:last-child{border-bottom:0}
+  .menu button.rouge{color:#8C2525}
+
   /* ---------- écran d'import ---------- */
   .panel{background:var(--surface);border-radius:12px;padding:16px;margin:0 0 14px}
   .panel h2{margin:0 0 6px;font-size:1rem;font-weight:620}
@@ -146,7 +214,7 @@
   <section id="vue-semaine">
     <div class="nav">
       <button class="arrow" id="prev" aria-label="Semaine précédente">‹</button>
-      <h1 id="titre">Planning<small id="sstitre">v8 — script non exécuté</small></h1>
+      <h1 id="titre">Planning<small id="sstitre">v11 — script non exécuté</small></h1>
       <button class="arrow" id="next" aria-label="Semaine suivante">›</button>
     </div>
     <div id="semaine"></div>
@@ -164,6 +232,12 @@
 </nav>
 
 <input type="file" id="fichier" accept=".xlsx,.xls">
+
+<div class="fond" id="fond"></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sh-t">
+  <h3 id="sh-t">Modifier</h3>
+  <div id="sh-corps"></div>
+</div>
 
 <script>
 "use strict";
@@ -194,6 +268,15 @@ const H = {
 
 const STAFFS = { 4:"Staff programmation chirurgicale", 5:"Réunion de service" }; // 4 = jeudi, 5 = vendredi
 const SALLES = /^(S\s*\d+|ECHO\s*\d+)$/i;
+
+// Semaine « courte » : mercredi non travaillé (90 %) et bloc l'après-midi au Bailleul.
+// Ancrage sur un lundi connu plutôt que sur la parité du numéro de semaine,
+// qui s'inverse au passage d'une année (S53 puis S1 : deux numéros impairs de suite).
+const ANCRE = Date.UTC(2027, 0, 4);        // lundi 04/01/2027, semaine à mercredi non travaillé
+function semaineCourte(d){
+  const l = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate() - ((d.getDay()+6) % 7));
+  return Math.round((l - ANCRE) / 604800000) % 2 === 0;
+}
 const AUTRES = {
   "GRE":"Grossesses à risque", "OBSTÉTRIQUE":"Obstétrique", "OBSTETRIQUE":"Obstétrique",
   "DAN":"Diagnostic anténatal", "HORS BLOC":"Chirurgie hors bloc",
@@ -271,7 +354,8 @@ function lireFeuille(ws, num){
 /* ================================================================== */
 /* Construction d'une journée                                          */
 /* ================================================================== */
-function construireJour(date, matin, aprem, garde, statut, paire){
+function construireJour(date, matin, aprem, garde, statut){
+  const courte = semaineCourte(date);
   const ev = [];
   const push = (titre,h,cls,note) => ev.push({titre, debut:h?h[0]:null, fin:h?h[1]:null, cls, note:note||null});
   const S = statut.toUpperCase();
@@ -282,6 +366,7 @@ function construireJour(date, matin, aprem, garde, statut, paire){
   const staff = () => { if(STAFFS[jour]) push(STAFFS[jour], H.staff, "staff"); };
 
   if(S === "CA"){ push("Congés", null, "off"); return ev; }
+  if(S === "CN"){ push("Congé de naissance", null, "off"); return ev; }
   if(S === "AT"){ push("Arrêt de travail", null, "off"); return ev; }
   if(S === "FMC"){ push("FMC", null, "fmc"); return ev; }
   if(S === "RS" || S === "RSN"){ push("Repos de sécurité", H.repos, "off"); return ev; }
@@ -290,7 +375,7 @@ function construireJour(date, matin, aprem, garde, statut, paire){
 
   if(/BAILLEUL|PSSL|SABL/i.test(statut)){
     push("Consultations", H.sableCsMatin, "cs", "Le Bailleul");
-    if(paire) push("Bloc opératoire", H.sableBloc, "bloc", "Le Bailleul");
+    if(courte) push("Bloc opératoire", H.sableBloc, "bloc", "Le Bailleul");
     else      push("Consultations", H.sableCsAprem, "cs", "Le Bailleul");
     return ev;
   }
@@ -335,7 +420,53 @@ function construireJour(date, matin, aprem, garde, statut, paire){
 /* ================================================================== */
 /* État et mémoire                                                     */
 /* ================================================================== */
-const CLE = "planning-ed-v8";
+const CLE = "planning-ed-v9";
+const CLE_RET = "planning-ed-retouches";   // volontairement sans numéro de version :
+                                           // les retouches survivent aux rechargements du semainier
+let RET = {};   // { "2027-02-18": { mod:{sig:{...}}, sup:[sig], add:[{...}] } }
+
+const TYPES = [["bloc","Bloc"],["cs","Consultation"],["visite","Visite"],["perm","Permanence"],
+               ["garde","Garde"],["staff","Staff"],["fmc","Formation"],["off","Absence"],
+               ["perso","Perso"]];
+
+function chargerRet(){
+  try{ RET = JSON.parse(localStorage.getItem(CLE_RET) || "{}") || {}; }catch(e){ RET = {}; }
+}
+function sauverRet(){
+  try{ localStorage.setItem(CLE_RET, JSON.stringify(RET)); }catch(e){}
+}
+function retDu(di){
+  if(!RET[di]) RET[di] = {mod:{}, sup:[], add:[]};
+  const r = RET[di];
+  r.mod = r.mod || {}; r.sup = r.sup || []; r.add = r.add || [];
+  return r;
+}
+function nettoyer(di){
+  const r = RET[di];
+  if(r && !Object.keys(r.mod).length && !r.sup.length && !r.add.length) delete RET[di];
+}
+const retouche = di => !!RET[di];
+const sigEv = e => e.titre + "|" + (e.debut || "") + "|" + (e.note || "");
+
+// Événements d'une journée, retouches appliquées. Seul point de vérité pour l'écran et l'export.
+function evJour(di, base){
+  const r = RET[di] || {};
+  const sup = r.sup || [], mod = r.mod || {}, add = r.add || [];
+  const out = [];
+  (base || []).forEach(e => {
+    const sg = sigEv(e);
+    if(sup.indexOf(sg) >= 0) return;
+    out.push(mod[sg] ? Object.assign({}, e, mod[sg], {ref:sg, chg:true})
+                     : Object.assign({}, e, {ref:sg}));
+  });
+  add.forEach(a => out.push(Object.assign({}, a, {ref:"+" + a.id, chg:true})));
+  out.sort((a,b) => (a.debut||"").localeCompare(b.debut||""));
+  return out;
+}
+function baseDu(di){
+  const j = PLANNING.find(x => iso(x.date) === di);
+  return j ? j.evenements : [];
+}
 let PLANNING = [];   // [{date:Date, semaine, evenements:[]}]
 let curseur = 0;     // index de la semaine affichée
 let SEMAINES = [];   // [{num, jours:[...]}]
@@ -356,9 +487,12 @@ function charger(){
 
 function grouper(){
   SEMAINES = [];
+  PLANNING.sort((a,b) => a.date - b.date);
   PLANNING.forEach(j => {
+    const d = j.date;
+    const l = iso(new Date(d.getFullYear(), d.getMonth(), d.getDate() - ((d.getDay()+6)%7)));
     let s = SEMAINES[SEMAINES.length-1];
-    if(!s || s.num !== j.semaine){ s = {num:j.semaine, jours:[]}; SEMAINES.push(s); }
+    if(!s || s.lundi !== l){ s = {lundi:l, num:j.semaine, jours:[]}; SEMAINES.push(s); }
     s.jours.push(j);
   });
   const auj = minuit(new Date());
@@ -372,13 +506,14 @@ function grouper(){
 const PXH = 42;                       // pixels par heure
 const mn = h => (+h.slice(0,2))*60 + (+h.slice(3,5));
 
-function frise(evs){
+function frise(evs, di){
   const pleins = evs.filter(e => !e.debut);
   const cales  = evs.filter(e => e.debut).map(e => ({...e, s:mn(e.debut), e2:mn(e.fin)}))
                     .sort((a,b) => a.s - b.s || b.e2 - a.e2);
 
   let html = pleins.map(e =>
-    '<div class="chip ' + e.cls + '"><span class="t">' + esc(e.titre) + '</span>' +
+    '<div class="chip ' + e.cls + (e.chg ? ' chg' : '') + '" data-d="' + di + '" data-ref="' + esc(e.ref||'') +
+    '"><span class="t">' + esc(e.titre) + '</span>' +
     (e.note ? '<span class="m">' + esc(e.note) + '</span>' : '') + '</div>').join("");
 
   if(!cales.length) return html;
@@ -403,7 +538,8 @@ function frise(evs){
   cales.forEach(e => {
     const t = y(e.s), ht = Math.max(20, y(e.e2) - t - 2);
     const l = e.col * 100 / nb, w = 100 / nb;
-    html += '<div class="blk ' + e.cls + (nb > 1 ? ' etroit' : '') + '" style="top:' + t +
+    html += '<div class="blk ' + e.cls + (nb > 1 ? ' etroit' : '') + (e.chg ? ' chg' : '') +
+            '" data-d="' + di + '" data-ref="' + esc(e.ref||'') + '" style="top:' + t +
             'px;height:' + ht + 'px;left:calc(' + l + '% + 4px);width:calc(' + w + '% - 8px)">' +
             '<span class="t">' + esc(e.titre) +
             (e.note ? ' <span class="m">' + esc(e.note) + '</span>' : '') + '</span>' +
@@ -446,16 +582,18 @@ function rendreSemaine(sens){
   let html = "";
   for(let k=0;k<7;k++){
     const d = new Date(debut); d.setDate(debut.getDate()+k);
-    const j = parDate[iso(d)];
-    const now = iso(d) === auj ? " now" : "";
-    if(!j){
-      if(k >= 5 || iso(d) < auj) continue; // week-end vide ou jour passé : on n'encombre pas
-      html += '<div class="day vide' + now + '"><div class="dh"><span class="j">' +
-              JOURS[d.getDay()] + " " + d.getDate() + '</span></div></div>';
+    const di = iso(d), now = di === auj ? " now" : "";
+    const evs = evJour(di, parDate[di] ? parDate[di].evenements : []);
+    const tete = '<div class="dh"><span class="g"><span class="j">' +
+                 JOURS[d.getDay()] + " " + d.getDate() + '</span>' +
+                 (retouche(di) ? '<span class="pt">retouché</span>' : '') +
+                 '</span><button class="men" data-menu="' + di + '" aria-label="Modifier cette journée">⋯</button></div>';
+    if(!evs.length){
+      if(k >= 5 || di < auj) continue;  // week-end vide ou jour passé : on n'encombre pas
+      html += '<div class="day vide' + now + '">' + tete + '</div>';
       continue;
     }
-    html += '<div class="day' + now + '"><div class="dh"><span class="j">' +
-            JOURS[d.getDay()] + " " + d.getDate() + '</span></div>' + frise(j.evenements) + '</div>';
+    html += '<div class="day' + now + '">' + tete + frise(evs, di) + '</div>';
   }
   zone.innerHTML = html;
 }
@@ -468,17 +606,24 @@ function rendreImport(msg){
   let html = msg ? '<div class="err">' + esc(msg) + '</div>' : "";
 
   if(PLANNING.length){
-    const total = PLANNING.reduce((n,j) => n + j.evenements.length, 0);
+    const dts = datesExport();
+    const total = dts.reduce((n,di) => n + evJour(di, baseDu(di)).length, 0);
+    const nRet = Object.keys(RET).length;
     html += '<div class="panel"><div class="stat">' +
             '<div><b>' + SEMAINES.length + '</b><span>semaines</span></div>' +
             '<div><b>' + PLANNING.length + '</b><span>journées</span></div>' +
-            '<div><b>' + total + '</b><span>événements</span></div></div></div>';
+            '<div><b>' + total + '</b><span>événements</span></div></div>' +
+            (nRet ? '<p style="margin:10px 0 0">' + nRet + (nRet > 1 ? ' journées retouchées' : ' journée retouchée') +
+                    ' à la main. Les retouches sont conservées quand tu recharges le semainier.</p>' : '') +
+            '</div>';
     html += '<button class="big" id="gen">Générer le calendrier</button>' +
             '<ul class="help">' +
             '<li>Ouvre le fichier téléchargé depuis l\'app Fichiers, puis « Tout ajouter » dans le calendrier Pro.</li>' +
             '<li>Avant de réimporter, supprime le calendrier Pro et recrée-le pour éviter les doublons.</li></ul>' +
             '<div style="height:14px"></div>' +
-            '<button class="big ghost" id="pick2">Charger un autre semainier</button>';
+            '<button class="big ghost" id="pick2">Ajouter un semainier</button>' +
+            '<div style="height:8px"></div>' +
+            '<button class="big ghost" id="vider">Tout effacer et repartir de zéro</button>';
   }else{
     html += '<div class="panel"><h2>Aucun semainier chargé</h2>' +
             '<p>Le fichier de l\'équipe couvre six mois. Les semaines déjà passées sont ignorées.</p></div>' +
@@ -490,24 +635,49 @@ function rendreImport(msg){
   if(p) p.addEventListener("click", () => document.getElementById("fichier").click());
   const g = document.getElementById("gen");
   if(g) g.addEventListener("click", telecharger);
+  const vd = document.getElementById("vider");
+  if(vd) vd.addEventListener("click", () => {
+    ouvrir("Tout effacer ?",
+      '<p style="margin:0 0 14px;color:var(--muted);font-size:.9rem">Les semainiers chargés seront supprimés. ' +
+      'Tes retouches manuelles sont conservées.</p><div class="actions">' +
+      '<button class="b3" data-act="oui">Effacer les semainiers</button>' +
+      '<button class="b2" data-act="non">Annuler</button></div>');
+    document.getElementById("sh-corps").onclick = ev => {
+      const b = ev.target.closest("button[data-act]"); if(!b) return;
+      if(b.dataset.act === "oui"){
+        PLANNING = []; SEMAINES = []; curseur = 0;
+        try{ localStorage.removeItem(CLE); }catch(e){}
+        rendreSemaine(); rendreImport();
+      }
+      fermer();
+    };
+  });
 }
 
 /* ================================================================== */
 /* Fichier calendrier                                                  */
 /* ================================================================== */
+function datesExport(){
+  const dates = PLANNING.map(j => iso(j.date));
+  Object.keys(RET).forEach(di => { if(dates.indexOf(di) < 0) dates.push(di); });
+  return dates.sort();
+}
+
 function ics(){
   const ech = s => String(s).replace(/([,;\\])/g,"\\$1").replace(/\n/g,"\\n");
   const stamp = new Date().toISOString().replace(/[-:]/g,"").split(".")[0] + "Z";
   const L = ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Semainier//FR","CALSCALE:GREGORIAN","METHOD:PUBLISH"];
-  PLANNING.forEach(j => {
-    const d = iso(j.date).replace(/-/g,"");
-    j.evenements.forEach((e,k) => {
+  const dates = datesExport();
+  dates.forEach(di => {
+    const d = di.replace(/-/g,"");
+    const jour = new Date(di + "T00:00:00");
+    evJour(di, baseDu(di)).forEach((e,k) => {
       L.push("BEGIN:VEVENT", "UID:" + d + "-" + k + "-semainier@local", "DTSTAMP:" + stamp);
       if(e.debut){
         L.push("DTSTART:" + d + "T" + e.debut.replace(":","") + "00");
         L.push("DTEND:"   + d + "T" + e.fin.replace(":","")   + "00");
       }else{
-        const f = new Date(j.date.getTime() + 86400000);
+        const f = new Date(jour.getTime() + 86400000);
         L.push("DTSTART;VALUE=DATE:" + d, "DTEND;VALUE=DATE:" + iso(f).replace(/-/g,""));
       }
       L.push("SUMMARY:" + ech(e.titre));
@@ -554,11 +724,10 @@ function traiter(buf){
     const f = lireFeuille(wb.Sheets[nom], num);
     const fin = f.dates[6] || f.dates[4];
     if(!fin || fin < auj) return;
-    const paire = num % 2 === 0;
     for(let i=0;i<7;i++){
       const d = f.dates[i];
       if(!d || d < auj) continue;
-      const evs = construireJour(d, f.matin[i], f.aprem[i], f.gardes[i], f.statuts[i], paire);
+      const evs = construireJour(d, f.matin[i], f.aprem[i], f.gardes[i], f.statuts[i]);
       if(evs.length){
         evs.sort((x,y) => (x.debut||"").localeCompare(y.debut||""));
         res.push({date:d, semaine:num, evenements:evs});
@@ -566,7 +735,11 @@ function traiter(buf){
     }
   });
   if(!res.length) throw new Error("Aucune vacation trouvée pour " + INITIALES + " à partir d'aujourd'hui. Vérifie que c'est le bon fichier.");
-  PLANNING = res;
+  // Un semainier couvre six mois ; le suivant prend le relais sans effacer la fin du précédent.
+  const parDate = {};
+  PLANNING.forEach(j => parDate[iso(j.date)] = j);
+  res.forEach(j => parDate[iso(j.date)] = j);   // en cas de chevauchement, le fichier chargé fait foi
+  PLANNING = Object.keys(parDate).sort().map(k => parDate[k]).filter(j => j.date >= auj);
   grouper(); sauver();
   rendreImport(); rendreSemaine();
   document.getElementById("tab-s").click();
@@ -588,6 +761,111 @@ vue.addEventListener("touchend", e => {
   if(!b.disabled) b.click();
 }, {passive:true});
 
+/* ================================================================== */
+/* Feuille d'édition                                                   */
+/* ================================================================== */
+const fond = document.getElementById("fond");
+const sheet = document.getElementById("sheet");
+
+function fermer(){ sheet.classList.remove("on"); fond.classList.remove("on"); }
+function ouvrir(titre, corps){
+  document.getElementById("sh-t").textContent = titre;
+  document.getElementById("sh-corps").innerHTML = corps;
+  fond.classList.add("on"); sheet.classList.add("on");
+}
+fond.addEventListener("click", fermer);
+
+function rafraichir(){ sauverRet(); rendreSemaine(); rendreImport(); }
+
+function menuJour(di){
+  const d = new Date(di + "T00:00:00");
+  ouvrir(JOURS[d.getDay()] + " " + d.getDate() + " " + MOIS[d.getMonth()],
+    '<div class="menu">' +
+    '<button data-act="add">Ajouter un créneau</button>' +
+    (evJour(di, baseDu(di)).length ? '<button class="rouge" data-act="vider">Vider la journée</button>' : '') +
+    (retouche(di) ? '<button data-act="reset">Rétablir le semainier</button>' : '') +
+    '<button data-act="rien">Annuler</button></div>');
+  document.getElementById("sh-corps").onclick = ev => {
+    const b = ev.target.closest("button[data-act]"); if(!b) return;
+    const a = b.dataset.act;
+    if(a === "add"){ editer(di, null); return; }
+    if(a === "vider"){
+      const r = retDu(di);
+      baseDu(di).forEach(e => { if(r.sup.indexOf(sigEv(e)) < 0) r.sup.push(sigEv(e)); });
+      r.add = []; r.mod = {};
+      fermer(); rafraichir(); return;
+    }
+    if(a === "reset"){ delete RET[di]; fermer(); rafraichir(); return; }
+    fermer();
+  };
+}
+
+function editer(di, ref){
+  const e = ref ? evJour(di, baseDu(di)).find(x => x.ref === ref) : null;
+  const nouveau = !e;
+  const v = e || {titre:"", cls:"perso", debut:"14:00", fin:"17:00", note:""};
+  const plein = !!e && !e.debut;
+  const d = new Date(di + "T00:00:00");
+
+  ouvrir((nouveau ? "Nouveau créneau — " : "") + JOURS[d.getDay()] + " " + d.getDate() + " " + MOIS[d.getMonth()],
+    '<label for="f-t">Intitulé</label><input type="text" id="f-t" value="' + esc(v.titre) + '" placeholder="Ex. RDV médical Lou">' +
+    '<label for="f-n">Précision (facultatif)</label><input type="text" id="f-n" value="' + esc(v.note || "") + '" placeholder="Ex. salle, confrère, lieu">' +
+    '<label>Type</label><div class="types" id="f-c">' +
+      TYPES.map(t => '<button type="button" class="' + t[0] + '" data-c="' + t[0] + '" aria-pressed="' +
+                     (t[0] === v.cls) + '">' + t[1] + '</button>').join("") + '</div>' +
+    '<label class="bascule"><input type="checkbox" id="f-j"' + (plein ? " checked" : "") + '> Journée entière</label>' +
+    '<div class="duo" id="f-h"><div><label for="f-d">Début</label><input type="time" id="f-d" value="' + (v.debut || "08:00") + '"></div>' +
+    '<div><label for="f-f">Fin</label><input type="time" id="f-f" value="' + (v.fin || "12:00") + '"></div></div>' +
+    '<div class="actions">' +
+    '<button class="b1" data-act="ok">Enregistrer</button>' +
+    (!nouveau && e.chg && ref[0] !== "+" ? '<button class="b2" data-act="rest">Rétablir depuis le semainier</button>' : '') +
+    (nouveau ? '' : '<button class="b3" data-act="sup">Supprimer ce créneau</button>') +
+    '<button class="b2" data-act="non">Annuler</button></div>');
+
+  let cls = v.cls;
+  const bloc = document.getElementById("f-h"), coche = document.getElementById("f-j");
+  const maj = () => bloc.style.display = coche.checked ? "none" : "flex";
+  coche.onchange = maj; maj();
+  document.getElementById("f-c").onclick = ev => {
+    const b = ev.target.closest("button[data-c]"); if(!b) return;
+    cls = b.dataset.c;
+    [...document.querySelectorAll("#f-c button")].forEach(x => x.setAttribute("aria-pressed", x === b));
+  };
+  document.getElementById("sh-corps").onclick = ev => {
+    const b = ev.target.closest("button[data-act]"); if(!b) return;
+    const a = b.dataset.act, r = retDu(di);
+    if(a === "non"){ nettoyer(di); fermer(); return; }
+    if(a === "sup"){
+      if(ref[0] === "+") r.add = r.add.filter(x => "+" + x.id !== ref);
+      else { delete r.mod[ref]; if(r.sup.indexOf(ref) < 0) r.sup.push(ref); }
+      nettoyer(di); fermer(); rafraichir(); return;
+    }
+    if(a === "rest"){ delete r.mod[ref]; nettoyer(di); fermer(); rafraichir(); return; }
+
+    const t = document.getElementById("f-t").value.trim();
+    if(!t){ document.getElementById("f-t").focus(); return; }
+    const note = document.getElementById("f-n").value.trim();
+    let deb = null, fin = null;
+    if(!coche.checked){
+      deb = document.getElementById("f-d").value || "08:00";
+      fin = document.getElementById("f-f").value || "12:00";
+      if(fin <= deb){ document.getElementById("f-f").focus(); return; }
+    }
+    const obj = {titre:t, note:note || null, cls:cls, debut:deb, fin:fin};
+    if(nouveau) r.add.push(Object.assign({id:Date.now().toString(36)}, obj));
+    else if(ref[0] === "+") r.add = r.add.map(x => "+" + x.id === ref ? Object.assign({}, x, obj) : x);
+    else r.mod[ref] = obj;
+    nettoyer(di); fermer(); rafraichir();
+  };
+}
+
+document.getElementById("semaine").addEventListener("click", ev => {
+  const m = ev.target.closest("button[data-menu]");
+  if(m){ menuJour(m.dataset.menu); return; }
+  const b = ev.target.closest(".blk,.chip");
+  if(b && b.dataset.d) editer(b.dataset.d, b.dataset.ref);
+});
+
 function onglet(actif){
   const s = actif === "s";
   document.getElementById("vue-semaine").hidden = !s;
@@ -600,6 +878,7 @@ document.getElementById("tab-s").addEventListener("click", () => onglet("s"));
 document.getElementById("tab-i").addEventListener("click", () => onglet("i"));
 
 /* Démarrage */
+chargerRet();
 if(charger()) grouper();
 rendreSemaine();
 rendreImport();
